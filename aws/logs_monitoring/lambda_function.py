@@ -266,25 +266,24 @@ def s3_handler(event, context, metadata):
         with gzip.GzipFile(fileobj=BytesIO(data)) as decompress_stream:
             # Reading line by line avoid a bug where gzip would take a very long time (>5min) for
             # file around 60MB gzipped
-            data = "".join(BufferedReader(decompress_stream))
-
-    if is_cloudtrail(str(key)):
-        cloud_trail = json.loads(data)
-        for event in cloud_trail["Records"]:
-            # Create structured object and send it
-            structured_line = merge_dicts(
-                event, {"aws": {"s3": {"bucket": bucket, "key": key}}}
-            )
-            yield structured_line
-    else:
-        # Send lines to Datadog
-        for line in data.splitlines():
-            # Create structured object and send it
-            structured_line = {
-                "aws": {"s3": {"bucket": bucket, "key": key}},
-                "message": line,
-            }
-            yield structured_line
+            if is_cloudtrail(str(key)):
+                data = "".join(BufferedReader(decompress_stream))
+                cloud_trail = json.loads(data)
+                for event in cloud_trail["Records"]:
+                    # Create structured object and send it
+                    structured_line = merge_dicts(
+                        event, {"aws": {"s3": {"bucket": bucket, "key": key}}}
+                    )
+                    yield structured_line
+            else:
+                # Send lines to Datadog
+                for line in decompress_stream:
+                    # Create structured object and send it
+                    structured_line = {
+                        "aws": {"s3": {"bucket": bucket, "key": key}},
+                        "message": line,
+                    }
+                    yield structured_line
 
 
 # Handle CloudWatch logs
